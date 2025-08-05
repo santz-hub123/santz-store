@@ -743,3 +743,895 @@ end
 -- ════════════════════════════════════════════════════════════════
 
 function Teleport.CreateTelePanel()
+    TelePanel = Instance.new("Frame", ScreenGui)
+    TelePanel.Name = "TelePanel"
+    TelePanel.Size = UDim2.new(0, 280, 0, 350)
+    TelePanel.Position = UDim2.new(1, -300, 0.5, -175)
+    TelePanel.BackgroundColor3 = Theme.SecondaryBg
+    TelePanel.BackgroundTransparency = Theme.PanelTransparency
+    TelePanel.BorderSizePixel = 0
+    TelePanel.Active = true
+    TelePanel.Visible = false
+    TelePanel.ZIndex = 2
+    
+    local corner = Instance.new("UICorner", TelePanel)
+    corner.CornerRadius = UDim.new(0, 12)
+    
+    Utils.CreateRGBBorder(TelePanel, 3)
+    Utils.MakeDraggable(TelePanel)
+    
+    -- Gradient Background
+    Utils.CreateGradientBg(TelePanel, Theme.SecondaryBg, Theme.MainBg)
+    
+    -- Title
+    local title = Instance.new("TextLabel", TelePanel)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundTransparency = 1
+    title.Text = "🚀 PAINEL DE TELEPORTE"
+    title.TextColor3 = Theme.Accent
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.ZIndex = 3
+    
+    -- Close Button
+    local closeBtn = Utils.CreateStyledButton(TelePanel, "❌", Theme.Disabled, UDim2.new(1, -35, 0, 5), UDim2.new(0, 30, 0, 30))
+    closeBtn.ZIndex = 3
+    closeBtn.MouseButton1Click:Connect(function()
+        TelePanel.Visible = false
+    end)
+    
+    -- Save Coordinate Button
+    local saveBtn = Utils.CreateStyledButton(
+        TelePanel, 
+        "💾 SALVAR POSIÇÃO", 
+        Theme.Enabled, 
+        UDim2.new(0, 10, 0, 50), 
+        UDim2.new(1, -20, 0, 35),
+        6023426925
+    )
+    saveBtn.ZIndex = 3
+    saveBtn.MouseButton1Click:Connect(Teleport.SaveCoordinate)
+    
+    -- Player Teleport Section
+    local playerLabel = Instance.new("TextLabel", TelePanel)
+    playerLabel.Size = UDim2.new(1, 0, 0, 25)
+    playerLabel.Position = UDim2.new(0, 10, 0, 95)
+    playerLabel.BackgroundTransparency = 1
+    playerLabel.Text = "👥 TELEPORTE PARA PLAYERS:"
+    playerLabel.TextColor3 = Color3.new(1, 1, 1)
+    playerLabel.TextScaled = true
+    playerLabel.Font = Enum.Font.GothamBold
+    playerLabel.TextXAlignment = Enum.TextXAlignment.Left
+    playerLabel.ZIndex = 3
+    
+    local playersList = Instance.new("ScrollingFrame", TelePanel)
+    playersList.Size = UDim2.new(1, -20, 0, 80)
+    playersList.Position = UDim2.new(0, 10, 0, 125)
+    playersList.BackgroundColor3 = Theme.MainBg
+    playersList.BackgroundTransparency = 0.3
+    playersList.BorderSizePixel = 0
+    playersList.ScrollBarThickness = 6
+    playersList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    playersList.ZIndex = 3
+    
+    local playersCorner = Instance.new("UICorner", playersList)
+    playersCorner.CornerRadius = UDim.new(0, 8)
+    
+    -- Coordinates List Label
+    local coordLabel = Instance.new("TextLabel", TelePanel)
+    coordLabel.Size = UDim2.new(1, 0, 0, 25)
+    coordLabel.Position = UDim2.new(0, 10, 0, 215)
+    coordLabel.BackgroundTransparency = 1
+    coordLabel.Text = "📍 COORDENADAS SALVAS:"
+    coordLabel.TextColor3 = Color3.new(1, 1, 1)
+    coordLabel.TextScaled = true
+    coordLabel.Font = Enum.Font.GothamBold
+    coordLabel.TextXAlignment = Enum.TextXAlignment.Left
+    coordLabel.ZIndex = 3
+    
+    -- Coordinates List
+    local coordsList = Instance.new("ScrollingFrame", TelePanel)
+    coordsList.Name = "CoordsList"
+    coordsList.Size = UDim2.new(1, -20, 0, 100)
+    coordsList.Position = UDim2.new(0, 10, 0, 245)
+    coordsList.BackgroundColor3 = Theme.MainBg
+    coordsList.BackgroundTransparency = 0.3
+    coordsList.BorderSizePixel = 0
+    coordsList.ScrollBarThickness = 6
+    coordsList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    coordsList.ZIndex = 3
+    
+    local coordsCorner = Instance.new("UICorner", coordsList)
+    coordsCorner.CornerRadius = UDim.new(0, 8)
+    
+    -- Update players list
+    local function updatePlayersList()
+        playersList:ClearAllChildren()
+        local players = Services.Players:GetPlayers()
+        playersList.CanvasSize = UDim2.new(0, 0, 0, #players * 35)
+        
+        for i, player in ipairs(players) do
+            if player ~= Player then
+                local playerBtn = Utils.CreateStyledButton(
+                    playersList,
+                    "🏃 " .. player.Name,
+                    Theme.Info,
+                    UDim2.new(0, 5, 0, (i-1) * 35),
+                    UDim2.new(1, -10, 0, 30)
+                )
+                playerBtn.ZIndex = 4
+                playerBtn.MouseButton1Click:Connect(function()
+                    Teleport.TeleportToPlayer(player)
+                end)
+            end
+        end
+    end
+    
+    -- Update players list every 3 seconds
+    task.spawn(function()
+        while TelePanel.Parent do
+            if TelePanel.Visible then
+                updatePlayersList()
+            end
+            task.wait(3)
+        end
+    end)
+    
+    Teleport.RefreshCoordsList()
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- PAINEL DE CONFIGURAÇÕES
+-- ════════════════════════════════════════════════════════════════
+
+local function CreateSettingsPanel()
+    SettingsPanel = Instance.new("Frame", ScreenGui)
+    SettingsPanel.Name = "SettingsPanel"
+    SettingsPanel.Size = UDim2.new(0, 300, 0, 400)
+    SettingsPanel.Position = UDim2.new(0.5, -150, 0.5, -200)
+    SettingsPanel.BackgroundColor3 = Theme.SecondaryBg
+    SettingsPanel.BackgroundTransparency = Theme.PanelTransparency
+    SettingsPanel.BorderSizePixel = 0
+    SettingsPanel.Active = true
+    SettingsPanel.Visible = false
+    SettingsPanel.ZIndex = 5
+    
+    local corner = Instance.new("UICorner", SettingsPanel)
+    corner.CornerRadius = UDim.new(0, 15)
+    
+    Utils.CreateRGBBorder(SettingsPanel, 3)
+    Utils.MakeDraggable(SettingsPanel)
+    Utils.CreateGradientBg(SettingsPanel, Theme.SecondaryBg, Theme.MainBg)
+    
+    -- Title
+    local title = Instance.new("TextLabel", SettingsPanel)
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.BackgroundTransparency = 1
+    title.Text = "⚙️ CONFIGURAÇÕES"
+    title.TextColor3 = Theme.Accent
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.ZIndex = 6
+    
+    -- Close Button
+    local closeBtn = Utils.CreateStyledButton(SettingsPanel, "❌", Theme.Disabled, UDim2.new(1, -40, 0, 5), UDim2.new(0, 35, 0, 35))
+    closeBtn.ZIndex = 6
+    closeBtn.MouseButton1Click:Connect(function()
+        SettingsPanel.Visible = false
+    end)
+    
+    -- Settings Content
+    local scrollFrame = Instance.new("ScrollingFrame", SettingsPanel)
+    scrollFrame.Size = UDim2.new(1, -20, 1, -70)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 60)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
+    scrollFrame.ZIndex = 6
+    
+    local yPos = 10
+    
+    -- Speed Settings
+    local speedLabel = Instance.new("TextLabel", scrollFrame)
+    speedLabel.Size = UDim2.new(1, -20, 0, 30)
+    speedLabel.Position = UDim2.new(0, 10, 0, yPos)
+    speedLabel.BackgroundTransparency = 1
+    speedLabel.Text = "🏃 Velocidade Superman: " .. Config.SupermanSpeed
+    speedLabel.TextColor3 = Color3.new(1, 1, 1)
+    speedLabel.TextScaled = true
+    speedLabel.Font = Enum.Font.Gotham
+    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    speedLabel.ZIndex = 7
+    
+    yPos = yPos + 40
+    
+    local speedSlider = Instance.new("Frame", scrollFrame)
+    speedSlider.Size = UDim2.new(1, -40, 0, 20)
+    speedSlider.Position = UDim2.new(0, 20, 0, yPos)
+    speedSlider.BackgroundColor3 = Theme.Button
+    speedSlider.BorderSizePixel = 0
+    speedSlider.ZIndex = 7
+    
+    local sliderCorner = Instance.new("UICorner", speedSlider)
+    sliderCorner.CornerRadius = UDim.new(0, 10)
+    
+    -- Add more settings here...
+    yPos = yPos + 60
+    
+    -- Notification Toggle
+    local notifBtn = Utils.CreateStyledButton(
+        scrollFrame,
+        Config.ShowNotifications and "🔔 Notificações: ON" or "🔕 Notificações: OFF",
+        Config.ShowNotifications and Theme.Enabled or Theme.Disabled,
+        UDim2.new(0, 10, 0, yPos),
+        UDim2.new(1, -20, 0, 35)
+    )
+    notifBtn.ZIndex = 7
+    notifBtn.MouseButton1Click:Connect(function()
+        Config.ShowNotifications = not Config.ShowNotifications
+        notifBtn.Text = Config.ShowNotifications and "🔔 Notificações: ON" or "🔕 Notificações: OFF"
+        notifBtn.BackgroundColor3 = Config.ShowNotifications and Theme.Enabled or Theme.Disabled
+    end)
+    
+    yPos = yPos + 50
+    
+    -- Auto Rejoin Toggle
+    local rejoinBtn = Utils.CreateStyledButton(
+        scrollFrame,
+        Config.AutoRejoin and "🔄 Auto Rejoin: ON" or "🔄 Auto Rejoin: OFF",
+        Config.AutoRejoin and Theme.Enabled or Theme.Disabled,
+        UDim2.new(0, 10, 0, yPos),
+        UDim2.new(1, -20, 0, 35)
+    )
+    rejoinBtn.ZIndex = 7
+    rejoinBtn.MouseButton1Click:Connect(function()
+        Config.AutoRejoin = not Config.AutoRejoin
+        rejoinBtn.Text = Config.AutoRejoin and "🔄 Auto Rejoin: ON" or "🔄 Auto Rejoin: OFF"
+        rejoinBtn.BackgroundColor3 = Config.AutoRejoin and Theme.Enabled or Theme.Disabled
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- PAINEL DE ESTATÍSTICAS
+-- ════════════════════════════════════════════════════════════════
+
+local function CreateStatsPanel()
+    StatsPanel = Instance.new("Frame", ScreenGui)
+    StatsPanel.Name = "StatsPanel"
+    StatsPanel.Size = UDim2.new(0, 250, 0, 300)
+    StatsPanel.Position = UDim2.new(0, 20, 0.5, -150)
+    StatsPanel.BackgroundColor3 = Theme.SecondaryBg
+    StatsPanel.BackgroundTransparency = Theme.PanelTransparency
+    StatsPanel.BorderSizePixel = 0
+    StatsPanel.Active = true
+    StatsPanel.Visible = false
+    StatsPanel.ZIndex = 3
+    
+    local corner = Instance.new("UICorner", StatsPanel)
+    corner.CornerRadius = UDim.new(0, 12)
+    
+    Utils.CreateRGBBorder(StatsPanel, 3)
+    Utils.MakeDraggable(StatsPanel)
+    Utils.CreateGradientBg(StatsPanel, Theme.SecondaryBg, Theme.MainBg)
+    
+    -- Title
+    local title = Instance.new("TextLabel", StatsPanel)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundTransparency = 1
+    title.Text = "📊 ESTATÍSTICAS"
+    title.TextColor3 = Theme.Accent
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.ZIndex = 4
+    
+    -- Close Button
+    local closeBtn = Utils.CreateStyledButton(StatsPanel, "❌", Theme.Disabled, UDim2.new(1, -35, 0, 5), UDim2.new(0, 30, 0, 30))
+    closeBtn.ZIndex = 4
+    closeBtn.MouseButton1Click:Connect(function()
+        StatsPanel.Visible = false
+    end)
+    
+    -- Stats Content
+    local statsFrame = Instance.new("Frame", StatsPanel)
+    statsFrame.Size = UDim2.new(1, -20, 1, -60)
+    statsFrame.Position = UDim2.new(0, 10, 0, 50)
+    statsFrame.BackgroundTransparency = 1
+    statsFrame.ZIndex = 4
+    
+    -- FPS Counter
+    local fpsLabel = Instance.new("TextLabel", statsFrame)
+    fpsLabel.Size = UDim2.new(1, 0, 0, 30)
+    fpsLabel.Position = UDim2.new(0, 0, 0, 10)
+    fpsLabel.BackgroundTransparency = 1
+    fpsLabel.Text = "🖥️ FPS: 60"
+    fpsLabel.TextColor3 = Color3.new(1, 1, 1)
+    fpsLabel.TextScaled = true
+    fpsLabel.Font = Enum.Font.Gotham
+    fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    fpsLabel.ZIndex = 5
+    
+    -- Ping Counter
+    local pingLabel = Instance.new("TextLabel", statsFrame)
+    pingLabel.Size = UDim2.new(1, 0, 0, 30)
+    pingLabel.Position = UDim2.new(0, 0, 0, 50)
+    pingLabel.BackgroundTransparency = 1
+    pingLabel.Text = "🌐 Ping: 0ms"
+    pingLabel.TextColor3 = Color3.new(1, 1, 1)
+    pingLabel.TextScaled = true
+    pingLabel.Font = Enum.Font.Gotham
+    pingLabel.TextXAlignment = Enum.TextXAlignment.Left
+    pingLabel.ZIndex = 5
+    
+    -- Player Count
+    local playersLabel = Instance.new("TextLabel", statsFrame)
+    playersLabel.Size = UDim2.new(1, 0, 0, 30)
+    playersLabel.Position = UDim2.new(0, 0, 0, 90)
+    playersLabel.BackgroundTransparency = 1
+    playersLabel.Text = "👥 Players: " .. #Services.Players:GetPlayers()
+    playersLabel.TextColor3 = Color3.new(1, 1, 1)
+    playersLabel.TextScaled = true
+    playersLabel.Font = Enum.Font.Gotham
+    playersLabel.TextXAlignment = Enum.TextXAlignment.Left
+    playersLabel.ZIndex = 5
+    
+    -- Position Info
+    local posLabel = Instance.new("TextLabel", statsFrame)
+    posLabel.Size = UDim2.new(1, 0, 0, 30)
+    posLabel.Position = UDim2.new(0, 0, 0, 130)
+    posLabel.BackgroundTransparency = 1
+    posLabel.Text = "📍 Posição: (0, 0, 0)"
+    posLabel.TextColor3 = Color3.new(1, 1, 1)
+    posLabel.TextScaled = true
+    posLabel.Font = Enum.Font.Gotham
+    posLabel.TextXAlignment = Enum.TextXAlignment.Left
+    posLabel.ZIndex = 5
+    
+    -- Update stats
+    task.spawn(function()
+        local frameCount = 0
+        local lastTime = tick()
+        
+        while StatsPanel.Parent do
+            if tick() - lastTime >= 1 then
+                local fps = frameCount
+                frameCount = 0
+                lastTime = tick()
+                
+                if StatsPanel.Visible then
+                    fpsLabel.Text = "🖥️ FPS: " .. fps
+                    pingLabel.Text = "🌐 Ping: " .. math.floor(Player:GetNetworkPing() * 1000) .. "ms"
+                    playersLabel.Text = "👥 Players: " .. #Services.Players:GetPlayers()
+                    
+                    if RootPart then
+                        local pos = RootPart.Position
+                        posLabel.Text = string.format("📍 Posição: (%.1f, %.1f, %.1f)", pos.X, pos.Y, pos.Z)
+                    end
+                end
+            end
+            
+            frameCount = frameCount + 1
+            Services.RunService.Heartbeat:Wait()
+        end
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- PAINEL SOBRE/CRÉDITOS MELHORADO
+-- ════════════════════════════════════════════════════════════════
+
+local function CreateAboutPanel()
+    AboutPanel = Instance.new("Frame", ScreenGui)
+    AboutPanel.Name = "AboutPanel"
+    AboutPanel.Size = UDim2.new(0, 280, 0, 200)
+    AboutPanel.Position = UDim2.new(0.5, -140, 0, 50)
+    AboutPanel.BackgroundColor3 = Theme.SecondaryBg
+    AboutPanel.BackgroundTransparency = Theme.PanelTransparency
+    AboutPanel.BorderSizePixel = 0
+    AboutPanel.Active = true
+    AboutPanel.Visible = false
+    AboutPanel.ZIndex = 4
+    
+    local corner = Instance.new("UICorner", AboutPanel)
+    corner.CornerRadius = UDim.new(0, 12)
+    
+    Utils.CreateRGBBorder(AboutPanel, 3)
+    Utils.MakeDraggable(AboutPanel)
+    Utils.CreateGradientBg(AboutPanel, Theme.SecondaryBg, Theme.MainBg)
+    
+    -- Title
+    local title = Instance.new("TextLabel", AboutPanel)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundTransparency = 1
+    title.Text = "ℹ️ SOBRE & CRÉDITOS"
+    title.TextColor3 = Theme.Accent
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.ZIndex = 5
+    
+    -- Close Button
+    local closeBtn = Utils.CreateStyledButton(AboutPanel, "❌", Theme.Disabled, UDim2.new(1, -35, 0, 5), UDim2.new(0, 30, 0, 30))
+    closeBtn.ZIndex = 5
+    closeBtn.MouseButton1Click:Connect(function()
+        AboutPanel.Visible = false
+    end)
+    
+    -- Description
+    local desc = Instance.new("TextLabel", AboutPanel)
+    desc.Size = UDim2.new(1, -20, 1, -60)
+    desc.Position = UDim2.new(0, 10, 0, 50)
+    desc.BackgroundTransparency = 1
+    desc.Text = [[🚀 SANTZ STORE V2.0
+    
+🔧 Script criado por: SANTZ
+📧 Discord: @santz  
+🌐 GitHub: santz-hub123
+
+✨ Melhorado por Claude AI
+⚡ Versão Premium com:
+• ESP Avançado
+• Sistema de Teleporte
+• Configurações Personalizáveis
+• Interface Moderna
+• Performance Otimizada
+
+💎 Compartilhe e Melhore!]]
+    desc.TextColor3 = Color3.new(1, 1, 1)
+    desc.TextScaled = true
+    desc.Font = Enum.Font.Gotham
+    desc.ZIndex = 5
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- INTERFACE PRINCIPAL MELHORADA
+-- ════════════════════════════════════════════════════════════════
+
+local function CreateMainGUI()
+    -- Destroy existing GUI
+    if PlayerGui:FindFirstChild("SantzStoreV2") then
+        PlayerGui.SantzStoreV2:Destroy()
+    end
+    
+    ScreenGui = Instance.new("ScreenGui", PlayerGui)
+    ScreenGui.Name = "SantzStoreV2"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Main Frame
+    MainFrame = Instance.new("Frame", ScreenGui)
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 280, 0, 500)
+    MainFrame.Position = UDim2.new(1, -300, 0.5, -250)
+    MainFrame.BackgroundColor3 = Theme.MainBg
+    MainFrame.BackgroundTransparency = Theme.PanelTransparency
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.ZIndex = 1
+    
+    local mainCorner = Instance.new("UICorner", MainFrame)
+    mainCorner.CornerRadius = UDim.new(0, 15)
+    
+    Utils.CreateRGBBorder(MainFrame, 4)
+    Utils.MakeDraggable(MainFrame)
+    Utils.CreateGradientBg(MainFrame, Theme.MainBg, Theme.SecondaryBg)
+    
+    -- Header Frame
+    local headerFrame = Instance.new("Frame", MainFrame)
+    headerFrame.Size = UDim2.new(1, 0, 0, 60)
+    headerFrame.BackgroundColor3 = Theme.Accent
+    headerFrame.BackgroundTransparency = 0.1
+    headerFrame.BorderSizePixel = 0
+    headerFrame.ZIndex = 2
+    
+    local headerCorner = Instance.new("UICorner", headerFrame)
+    headerCorner.CornerRadius = UDim.new(0, 15)
+    
+    Utils.CreateGradientBg(headerFrame, Theme.Accent, Theme.AccentDark)
+    
+    -- Title
+    local title = Instance.new("TextLabel", headerFrame)
+    title.Size = UDim2.new(1, -120, 1, 0)
+    title.Position = UDim2.new(0, 10, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "🚀 SANTZ STORE V2.0"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 3
+    
+    -- Control Buttons
+    local aboutBtn = Utils.CreateStyledButton(headerFrame, "ℹ️", Theme.Info, UDim2.new(1, -110, 0, 10), UDim2.new(0, 30, 0, 30))
+    aboutBtn.ZIndex = 3
+    
+    local settingsBtn = Utils.CreateStyledButton(headerFrame, "⚙️", Theme.Warning, UDim2.new(1, -75, 0, 10), UDim2.new(0, 30, 0, 30))
+    settingsBtn.ZIndex = 3
+    
+    local minimizeBtn = Utils.CreateStyledButton(headerFrame, "➖", Theme.Info, UDim2.new(1, -40, 0, 10), UDim2.new(0, 30, 0, 30))
+    minimizeBtn.ZIndex = 3
+    
+    -- Button Container
+    local buttonContainer = Instance.new("ScrollingFrame", MainFrame)
+    buttonContainer.Name = "ButtonContainer"
+    buttonContainer.Size = UDim2.new(1, -20, 1, -80)
+    buttonContainer.Position = UDim2.new(0, 10, 0, 70)
+    buttonContainer.BackgroundTransparency = 1
+    buttonContainer.BorderSizePixel = 0
+    buttonContainer.ScrollBarThickness = 8
+    buttonContainer.CanvasSize = UDim2.new(0, 0, 0, 800)
+    buttonContainer.ZIndex = 2
+    
+    -- Enhanced Button List
+    local buttons = {
+        {name="ESP GOD", color=Theme.ESPGod, func=ESP.ToggleGodESP, icon=6031090935, desc="Detecta players com poderes divinos"},
+        {name="ESP SECRET", color=Theme.ESPSecret, func=ESP.ToggleSecretESP, icon=6031075934, desc="Revela áreas secretas ocultas"},
+        {name="ESP BASE", color=Theme.ESPBase, func=ESP.ToggleBaseESP, icon=6031094678, desc="Mostra bases e portas importantes"},
+        {name="ESP PLAYER", color=Theme.ESPPlayer, func=ESP.TogglePlayerESP, icon=6034996691, desc="Destaca todos os players"},
+        {name="ESP NAME", color=Theme.ESPName, func=ESP.ToggleNameESP, icon=6026568198, desc="Exibe nomes dos players"},
+        {name="ESP ITEM", color=Theme.ESPItem, func=ESP.ToggleItemESP, icon=6023426925, desc="Localiza itens importantes"},
+        {name="🚀 TELEPORTE", color=Theme.Accent, func=function() 
+            if not TelePanel then Teleport.CreateTelePanel() end
+            TelePanel.Visible = not TelePanel.Visible
+        end, icon=6034996691, desc="Painel avançado de teleporte"},
+        {name="⚡ DASH", color=Theme.Disabled, func=Movement.ActivateDash, icon=6031090935, desc="Dash rápido para frente"},
+        {name="🦸 SUPERMAN", color=Theme.Warning, func=Movement.ToggleSuperman, icon=6034981416, desc="Modo Superman ativado"},
+        {name="🛡️ ANTI-HIT", color=Theme.Info, func=Movement.ToggleAntiHit, icon=6031075934, desc="Proteção contra ataques"},
+        {name="👻 NOCLIP", color=Theme.ESPSecret, func=Movement.ToggleNoclip, icon=6026568198, desc="Atravessa paredes"},
+        {name="📊 STATS", color=Theme.AccentDark, func=function()
+            if not StatsPanel then CreateStatsPanel() end
+            StatsPanel.Visible = not StatsPanel.Visible
+        end, icon=6034996691, desc="Estatísticas do jogo"}
+    }
+    
+    for i, buttonData in ipairs(buttons) do
+        local btnFrame = Instance.new("Frame", buttonContainer)
+        btnFrame.Size = UDim2.new(1, 0, 0, 50)
+        btnFrame.Position = UDim2.new(0, 0, 0, (i-1) * 55)
+        btnFrame.BackgroundTransparency = 1
+        btnFrame.ZIndex = 3
+        
+        local btn = Utils.CreateStyledButton(
+            btnFrame, 
+            buttonData.name, 
+            buttonData.color, 
+            UDim2.new(0, 0, 0, 0), 
+            UDim2.new(1, 0, 0, 45), 
+            buttonData.icon
+        )
+        btn.ZIndex = 4
+        
+        -- Status indicator
+        local statusIndicator = Instance.new("Frame", btn)
+        statusIndicator.Size = UDim2.new(0, 8, 0, 8)
+        statusIndicator.Position = UDim2.new(1, -15, 0, 5)
+        statusIndicator.BackgroundColor3 = Theme.Disabled
+        statusIndicator.BorderSizePixel = 0
+        statusIndicator.ZIndex = 5
+        
+        local indicatorCorner = Instance.new("UICorner", statusIndicator)
+        indicatorCorner.CornerRadius = UDim.new(1, 0)
+        
+        btn.MouseButton1Click:Connect(function()
+            buttonData.func()
+            
+            -- Update button state
+            local cleanName = buttonData.name:gsub("🚀 ", ""):gsub("⚡ ", ""):gsub("🦸 ", ""):gsub("🛡️ ", ""):gsub("👻 ", ""):gsub("📊 ", "")
+            local isActive = ToggleStates[cleanName] or ToggleStates["ESP_" .. cleanName] or false
+            
+            if isActive then
+                btn.BackgroundColor3 = Theme.Enabled
+                statusIndicator.BackgroundColor3 = Theme.Enabled
+                Utils.TweenProperty(statusIndicator, {BackgroundColor3 = Theme.Enabled}, 0.3)
+            else
+                btn.BackgroundColor3 = buttonData.color
+                statusIndicator.BackgroundColor3 = Theme.Disabled
+                Utils.TweenProperty(statusIndicator, {BackgroundColor3 = Theme.Disabled}, 0.3)
+            end
+        end)
+    end
+    
+    -- Control Button Events
+    aboutBtn.MouseButton1Click:Connect(function()
+        if not AboutPanel then CreateAboutPanel() end
+        AboutPanel.Visible = not AboutPanel.Visible
+    end)
+    
+    settingsBtn.MouseButton1Click:Connect(function()
+        if not SettingsPanel then CreateSettingsPanel() end
+        SettingsPanel.Visible = not SettingsPanel.Visible
+    end)
+    
+    minimizeBtn.MouseButton1Click:Connect(function()
+        IsMinimized = not IsMinimized
+        local targetSize = IsMinimized and UDim2.new(0, 280, 0, 60) or UDim2.new(0, 280, 0, 500)
+        
+        Utils.TweenProperty(MainFrame, {Size = targetSize}, 0.5)
+        buttonContainer.Visible = not IsMinimized
+        minimizeBtn.Text = IsMinimized and "➕" or "➖"
+        
+        -- Hide other panels when minimized
+        if IsMinimized then
+            if TelePanel then TelePanel.Visible = false end
+            if StatsPanel then StatsPanel.Visible = false end
+            if SettingsPanel then SettingsPanel.Visible = false end
+        end
+    end)
+    
+    -- Animate GUI entrance
+    MainFrame.Position = UDim2.new(1, 0, 0.5, -250)
+    Utils.TweenProperty(MainFrame, {Position = UDim2.new(1, -300, 0.5, -250)}, 1, Enum.EasingStyle.Back)
+    
+    Utils.ShowNotification("SANTZ STORE V2.0", "Interface carregada com sucesso! ✨", 3)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- SISTEMA DE SEGURANÇA & ANTI-KICK
+-- ════════════════════════════════════════════════════════════════
+
+local Security = {}
+
+function Security.InitAntiKick()
+    if not Config.AntiKick then return end
+    
+    -- Anti-Kick Protection
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        
+        if method == "Kick" then
+            Utils.ShowNotification("SEGURANÇA", "Tentativa de kick bloqueada! 🛡️", 3)
+            return
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    setreadonly(mt, true)
+    
+    Utils.ShowNotification("SEGURANÇA", "Proteção anti-kick ativada! 🛡️", 2)
+end
+
+function Security.InitAutoRejoin()
+    if not Config.AutoRejoin then return end
+    
+    Services.Players.PlayerRemoving:Connect(function(player)
+        if player == Player then
+            task.wait(1)
+            game:GetService("TeleportService"):Teleport(game.PlaceId, Player)
+        end
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- SISTEMA DE KEYBINDS
+-- ════════════════════════════════════════════════════════════════
+
+local Keybinds = {
+    ToggleGUI = Enum.KeyCode.Insert,
+    Dash = Enum.KeyCode.G,
+    Superman = Enum.KeyCode.F,
+    Noclip = Enum.KeyCode.N,
+    TelePanel = Enum.KeyCode.T
+}
+
+local function InitKeybinds()
+    Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Keybinds.ToggleGUI then
+            if MainFrame then
+                MainFrame.Visible = not MainFrame.Visible
+            end
+        elseif input.KeyCode == Keybinds.Dash then
+            Movement.ActivateDash()
+        elseif input.KeyCode == Keybinds.Superman then
+            Movement.ToggleSuperman()
+        elseif input.KeyCode == Keybinds.Noclip then
+            Movement.ToggleNoclip()
+        elseif input.KeyCode == Keybinds.TelePanel then
+            if TelePanel then
+                TelePanel.Visible = not TelePanel.Visible
+            elseif MainFrame then
+                if not TelePanel then Teleport.CreateTelePanel() end
+                TelePanel.Visible = true
+            end
+        end
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- SISTEMA DE ATUALIZAÇÕES AUTOMÁTICAS
+-- ════════════════════════════════════════════════════════════════
+
+local function UpdateESPSystems()
+    task.spawn(function()
+        while true do
+            local currentTime = tick()
+            if currentTime - LastUpdateTime >= Config.ESPUpdateRate then
+                LastUpdateTime = currentTime
+                
+                -- Update ESP for new players
+                if ToggleStates["ESP_GOD"] then ESP.ToggleGodESP(); ESP.ToggleGodESP() end
+                if ToggleStates["ESP_PLAYER"] then ESP.TogglePlayerESP(); ESP.TogglePlayerESP() end
+                if ToggleStates["ESP_NAME"] then ESP.ToggleNameESP(); ESP.ToggleNameESP() end
+                
+                -- Update ESP for new objects (less frequent)
+                if math.random(1, 10) == 1 then
+                    if ToggleStates["ESP_SECRET"] then ESP.ToggleSecretESP(); ESP.ToggleSecretESP() end
+                    if ToggleStates["ESP_BASE"] then ESP.ToggleBaseESP(); ESP.ToggleBaseESP() end
+                    if ToggleStates["ESP_ITEM"] then ESP.ToggleItemESP(); ESP.ToggleItemESP() end
+                end
+            end
+            task.wait(Config.ESPUpdateRate)
+        end
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- EVENTOS DO PLAYER
+-- ════════════════════════════════════════════════════════════════
+
+local function ConnectPlayerEvents()
+    -- Character Respawn Handler
+    Player.CharacterAdded:Connect(function()
+        Utils.UpdateCharacterRefs()
+        
+        -- Restore states after respawn
+        task.wait(2)
+        if ToggleStates["Superman"] then
+            Movement.ToggleSuperman()
+            Movement.ToggleSuperman()
+        end
+        if ToggleStates["NOCLIP"] then
+            Movement.ToggleNoclip()
+            Movement.ToggleNoclip()
+        end
+        
+        Utils.ShowNotification("RESPAWN", "Estados restaurados após respawn! ✨", 2)
+    end)
+    
+    -- Player Joining/Leaving
+    Services.Players.PlayerAdded:Connect(function(player)
+        Utils.ShowNotification("PLAYER", player.Name .. " entrou no jogo! 👋", 2)
+    end)
+    
+    Services.Players.PlayerRemoving:Connect(function(player)
+        Utils.ShowNotification("PLAYER", player.Name .. " saiu do jogo! 👋", 2)
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- SISTEMA DE COMANDOS VIA CHAT
+-- ════════════════════════════════════════════════════════════════
+
+local function InitChatCommands()
+    Player.Chatted:Connect(function(message)
+        local msg = message:lower()
+        
+        if msg:sub(1, 7) == "/santz " then
+            local command = msg:sub(8)
+            
+            if command == "dash" then
+                Movement.ActivateDash()
+            elseif command == "superman" then
+                Movement.ToggleSuperman()
+            elseif command == "noclip" then
+                Movement.ToggleNoclip()
+            elseif command == "esp" then
+                ESP.TogglePlayerESP()
+            elseif command == "tele" then
+                if not TelePanel then Teleport.CreateTelePanel() end
+                TelePanel.Visible = true
+            elseif command == "save" then
+                Teleport.SaveCoordinate()
+            elseif command == "help" then
+                Utils.ShowNotification("COMANDOS", [[
+Comandos disponíveis:
+/santz dash - Ativar dash
+/santz superman - Toggle superman
+/santz noclip - Toggle noclip
+/santz esp - Toggle ESP players
+/santz tele - Abrir painel teleporte
+/santz save - Salvar coordenada
+                ]], 5)
+            end
+        end
+    end)
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- INICIALIZAÇÃO PRINCIPAL
+-- ════════════════════════════════════════════════════════════════
+
+local function Initialize()
+    -- Initialize character references
+    Utils.UpdateCharacterRefs()
+    
+    -- Initialize toggle states
+    for _, state in pairs({
+        "ESP_GOD", "ESP_SECRET", "ESP_BASE", "ESP_PLAYER", "ESP_NAME", "ESP_ITEM",
+        "Superman", "ANTI_HIT", "NOCLIP"
+    }) do
+        ToggleStates[state] = false
+    end
+    
+    -- Create main interface
+    CreateMainGUI()
+    
+    -- Initialize systems
+    Security.InitAntiKick()
+    Security.InitAutoRejoin()
+    InitKeybinds()
+    InitChatCommands()
+    ConnectPlayerEvents()
+    UpdateESPSystems()
+    
+    -- Play startup sound
+    Utils.PlaySound(131961136, 0.8)
+    
+    -- Welcome message
+    task.wait(1)
+    Utils.ShowNotification("SANTZ STORE V2.0", [[
+🚀 Bem-vindo ao SANTZ STORE V2.0!
+
+⌨️ KEYBINDS:
+• INSERT - Toggle GUI
+• G - Dash
+• F - Superman
+• N - Noclip
+• T - Painel Teleporte
+
+💬 COMANDOS:
+• /santz help - Ver comandos
+
+✨ Script totalmente otimizado!
+    ]], 8)
+    
+    print("🚀 SANTZ STORE V2.0 - Carregado com sucesso!")
+    print("📧 Discord: @santz | 🌐 GitHub: santz-hub123")
+    print("✨ Melhorado por Claude AI - Versão Premium")
+end
+
+-- ════════════════════════════════════════════════════════════════
+-- TRATAMENTO DE ERROS & CLEANUP
+-- ════════════════════════════════════════════════════════════════
+
+local function Cleanup()
+    -- Disconnect all connections
+    for _, connection in pairs(Connections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    
+    -- Clear all ESP
+    for _, espType in pairs(ESPRefs) do
+        for _, esp in pairs(espType) do
+            if esp then esp:Destroy() end
+        end
+    end
+    
+    -- Destroy GUI
+    if ScreenGui then
+        ScreenGui:Destroy()
+    end
+    
+    print("🧹 SANTZ STORE V2.0 - Cleanup realizado!")
+end
+
+-- Error handling wrapper
+local success, error = pcall(Initialize)
+if not success then
+    warn("❌ SANTZ STORE V2.0 - Erro durante inicialização: " .. tostring(error))
+    Utils.ShowNotification("ERRO", "Falha na inicialização: " .. tostring(error), 5)
+end
+
+-- Cleanup on game shutdown
+game:BindToClose(Cleanup)
+
+-- ════════════════════════════════════════════════════════════════
+-- FINAL DO SCRIPT - SANTZ STORE V2.0
+-- ════════════════════════════════════════════════════════════════
