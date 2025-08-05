@@ -1,5 +1,5 @@
 -- SANTZ STORE Script
--- LocalScript para Roblox
+-- Script Lua para Executores Roblox
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -7,10 +7,11 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local character = player.CharacterAdded:Wait()
+local playerGui = player:FindFirstChild("PlayerGui") or CoreGui
+local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
@@ -129,8 +130,15 @@ local function toggle2Dash()
         connections.twoDash = UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if gameProcessed then return end
             if input.KeyCode == Enum.KeyCode.Z then
-                local lookDirection = rootPart.CFrame.LookVector
-                rootPart.Velocity = lookDirection * 100 + Vector3.new(0, 20, 0)
+                if rootPart then
+                    local lookDirection = rootPart.CFrame.LookVector
+                    local bodyVelocity = Instance.new("BodyVelocity")
+                    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    bodyVelocity.Velocity = lookDirection * 100
+                    bodyVelocity.Parent = rootPart
+                    
+                    game:GetService("Debris"):AddItem(bodyVelocity, 0.5)
+                end
             end
         end)
     else
@@ -145,11 +153,23 @@ local function toggleSpeedBoost()
     buttonStates.speedBoost = not buttonStates.speedBoost
     
     if buttonStates.speedBoost then
-        humanoid.WalkSpeed = 50
-        humanoid.JumpPower = 100
+        if humanoid then
+            humanoid.WalkSpeed = 50
+            if humanoid:FindFirstChild("JumpHeight") then
+                humanoid.JumpHeight = 100
+            else
+                humanoid.JumpPower = 100
+            end
+        end
     else
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            if humanoid:FindFirstChild("JumpHeight") then
+                humanoid.JumpHeight = 7.2
+            else
+                humanoid.JumpPower = 50
+            end
+        end
     end
 end
 
@@ -157,15 +177,29 @@ local function toggleJumpBoost()
     buttonStates.jumpBoost = not buttonStates.jumpBoost
     
     if buttonStates.jumpBoost then
-        humanoid.JumpPower = 100
+        if humanoid then
+            if humanoid:FindFirstChild("JumpHeight") then
+                humanoid.JumpHeight = 100
+            else
+                humanoid.JumpPower = 100
+            end
+        end
     else
-        humanoid.JumpPower = 50
+        if humanoid then
+            if humanoid:FindFirstChild("JumpHeight") then
+                humanoid.JumpHeight = 7.2
+            else
+                humanoid.JumpPower = 50
+            end
+        end
     end
 end
 
 local function saveCoordinate()
-    config.savedCoordinate = rootPart.Position
-    print("Coordenada salva:", config.savedCoordinate)
+    if rootPart then
+        config.savedCoordinate = rootPart.Position
+        print("Coordenada salva:", config.savedCoordinate)
+    end
 end
 
 local function toggleTeleGuided()
@@ -339,11 +373,18 @@ local function toggleESPBase()
     end
 end
 
+-- Verificar se já existe uma instância e remover
+if playerGui:FindFirstChild("SantzStore") then
+    playerGui:FindFirstChild("SantzStore"):Destroy()
+end
+
 -- Criação da interface principal
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SantzStore"
 screenGui.Parent = playerGui
-screenGui.ResetOnSpawn = false
+if screenGui:FindFirstChild("ResetOnSpawn") then
+    screenGui.ResetOnSpawn = false
+end
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
@@ -453,6 +494,7 @@ TweenService:Create(mainFrame, TweenInfo.new(1, Enum.EasingStyle.Quart, Enum.Eas
 
 -- Reconexão quando o personagem respawna
 player.CharacterAdded:Connect(function(newCharacter)
+    task.wait(1) -- Aguardar o personagem carregar completamente
     character = newCharacter
     humanoid = character:WaitForChild("Humanoid")
     rootPart = character:WaitForChild("HumanoidRootPart")
@@ -471,4 +513,7 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
-print("SANTZ STORE carregado com sucesso!")
+-- Inicialização
+print("🟢 SANTZ STORE carregado com sucesso!")
+print("📍 Painel criado - Arraste para mover")
+print("💾 Coordenadas salvas persistem após reset")
