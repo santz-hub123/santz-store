@@ -275,7 +275,7 @@ local function saveCoordinate()
     end
 end
 
--- TELEGUIADO INTELIGENTE com velocidade 50
+-- TELEGUIADO INTELIGENTE com velocidade constante 50
 local function activateTeleGuided()
     if not data.savedCoordinate then
         print("❌ Nenhuma coordenada salva!")
@@ -287,13 +287,11 @@ local function activateTeleGuided()
     if data.states.teleGuided then
         local rootPart = getRootPart()
         
-        local bodyPosition = Instance.new("BodyPosition")
-        bodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
-        bodyPosition.Position = rootPart.Position
-        bodyPosition.D = 3000
-        bodyPosition.P = 10000
-        bodyPosition.Parent = rootPart
-        table.insert(data.bodyMovers, bodyPosition)
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.Parent = rootPart
+        table.insert(data.bodyMovers, bodyVelocity)
         
         data.connections.teleGuided = RunService.Heartbeat:Connect(function()
             if not data.savedCoordinate or not rootPart.Parent then return end
@@ -303,24 +301,26 @@ local function activateTeleGuided()
             local distance = (targetPos - currentPos).Magnitude
             
             if distance > 3 then
-                -- Sistema inteligente anti-colisão
+                -- Direção para o destino
                 local direction = (targetPos - currentPos).Unit
-                local raycast = workspace:Raycast(currentPos, direction * math.min(distance, 20))
+                
+                -- Sistema inteligente anti-colisão
+                local raycast = workspace:Raycast(currentPos, direction * 15)
                 
                 if raycast and raycast.Instance.CanCollide then
-                    -- Obstáculo detectado - desviar
+                    -- Obstáculo detectado - desviar mantendo velocidade 50
                     local normal = raycast.Normal
                     local rightVector = direction:Cross(Vector3.new(0, 1, 0)).Unit
-                    local newDirection = (direction + rightVector * 0.5).Unit
+                    local newDirection = (direction + rightVector * 0.7).Unit
                     
-                    bodyPosition.Position = currentPos + newDirection * 15 + Vector3.new(0, 5, 0)
+                    bodyVelocity.Velocity = newDirection * 50 + Vector3.new(0, 10, 0)
                 else
-                    -- Caminho livre
-                    bodyPosition.Position = targetPos + Vector3.new(0, 2, 0)
+                    -- Caminho livre - velocidade constante 50
+                    bodyVelocity.Velocity = direction * 50
                 end
             else
                 -- Chegou ao destino
-                bodyPosition:Destroy()
+                bodyVelocity:Destroy()
                 data.connections.teleGuided:Disconnect()
                 data.connections.teleGuided = nil
                 data.states.teleGuided = false
@@ -328,7 +328,7 @@ local function activateTeleGuided()
             end
         end)
         
-        print("🚀 Teleporte ativo - Velocidade 50")
+        print("🚀 Teleporte ativo - Velocidade constante 50")
     else
         if data.connections.teleGuided then
             data.connections.teleGuided:Disconnect()
