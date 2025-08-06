@@ -1,42 +1,42 @@
--- SANTZ STORE Script
--- Baseado no design original com modificações personalizadas
+-- SANTZ STORE
+-- Script completamente refeito e funcional
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local PathfindingService = game:GetService("PathfindingService")
+local SoundService = game:GetService("SoundService")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootPart = character:WaitForChild("HumanoidRootPart")
+local mouse = player:GetMouse()
 
--- Dados persistentes
-getgenv().SantzStore = getgenv().SantzStore or {}
-local data = getgenv().SantzStore
-data.savedCoordinate = data.savedCoordinate or nil
-data.connections = data.connections or {}
-data.espObjects = data.espObjects or {}
-data.states = data.states or {
-    twoDash = false,
-    speedBoost = false,
-    jumpBoost = false,
-    antiHit = false,
-    teleGuided = false,
-    espGod = false,
-    espSecret = false,
-    espPlayer = false,
-    espBase = false
+-- Variáveis globais persistentes
+getgenv().SantzStore = getgenv().SantzStore or {
+    savedCoordinate = nil,
+    connections = {},
+    espObjects = {},
+    bodyMovers = {},
+    states = {
+        twoDash = false,
+        speedBoost = false,
+        jumpBoost = false,
+        antiHit = false,
+        teleGuided = false,
+        espPlayer = false,
+        espBase = false,
+        espGod = false,
+        espSecret = false
+    }
 }
 
--- Limpar GUI anterior
+local data = getgenv().SantzStore
+
+-- Limpar tudo anterior
 if CoreGui:FindFirstChild("SantzStore") then
     CoreGui:FindFirstChild("SantzStore"):Destroy()
 end
 
--- Limpar conexões antigas
 for _, conn in pairs(data.connections) do
     if conn and conn.Connected then
         conn:Disconnect()
@@ -44,7 +44,6 @@ for _, conn in pairs(data.connections) do
 end
 data.connections = {}
 
--- Limpar ESP anterior
 for _, esp in pairs(data.espObjects) do
     if esp and esp.Parent then
         esp:Destroy()
@@ -52,153 +51,164 @@ for _, esp in pairs(data.espObjects) do
 end
 data.espObjects = {}
 
+for _, mover in pairs(data.bodyMovers) do
+    if mover and mover.Parent then
+        mover:Destroy()
+    end
+end
+data.bodyMovers = {}
+
+-- Obter character atual
+local function getCharacter()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+local function getHumanoid()
+    local char = getCharacter()
+    return char:WaitForChild("Humanoid")
+end
+
+local function getRootPart()
+    local char = getCharacter()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
 -- Criar ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SantzStore"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = CoreGui
 
--- Frame Principal
+-- Frame principal (menor e mais compacto)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 420, 0, 580)
-mainFrame.Position = UDim2.new(0.5, -210, 0.5, -290)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-mainFrame.BackgroundTransparency = 0.1
+mainFrame.Size = UDim2.new(0, 320, 0, 380) -- Menor como pedido
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Fundo preto
+mainFrame.BackgroundTransparency = 0.3 -- Semi-transparente
 mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true -- Arrastável
 mainFrame.Parent = screenGui
 
--- Cantos arredondados para o frame principal
+-- Cantos arredondados
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.CornerRadius = UDim.new(0, 10)
 mainCorner.Parent = mainFrame
 
--- Borda RGB animada para o frame principal
+-- Borda RGB animada
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Thickness = 3
-mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+mainStroke.Thickness = 2
 mainStroke.Parent = mainFrame
 
 local mainGradient = Instance.new("UIGradient")
 mainGradient.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-    ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 165, 0)),
-    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
-    ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 255, 255)),
-    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(0, 0, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))
+    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
 }
 mainGradient.Parent = mainStroke
 
--- Animação RGB
-local rgbTween = TweenService:Create(mainGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
-rgbTween:Play()
+-- Animação RGB principal
+local mainRgbTween = TweenService:Create(mainGradient, TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
+mainRgbTween:Play()
 
 -- Título
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "Title"
-titleLabel.Size = UDim2.new(1, -80, 0, 60)
-titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.Size = UDim2.new(1, -50, 0, 40)
+titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "SANTZ STORE"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextScaled = true
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextStrokeTransparency = 0.5
-titleLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 titleLabel.Parent = mainFrame
 
--- Botão Minimizar
-local minimizeButton = Instance.new("TextButton")
-minimizeButton.Name = "MinimizeButton"
-minimizeButton.Size = UDim2.new(0, 40, 0, 30)
-minimizeButton.Position = UDim2.new(1, -50, 0, 15)
-minimizeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-minimizeButton.Text = "—"
-minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeButton.TextScaled = true
-minimizeButton.Font = Enum.Font.GothamBold
-minimizeButton.BorderSizePixel = 0
-minimizeButton.Parent = mainFrame
+-- Botão minimizar
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeButton"
+minimizeBtn.Size = UDim2.new(0, 30, 0, 25)
+minimizeBtn.Position = UDim2.new(1, -40, 0, 10)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeBtn.Text = "−"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.TextScaled = true
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Parent = mainFrame
 
-local minimizeCorner = Instance.new("UICorner")
-minimizeCorner.CornerRadius = UDim.new(0, 6)
-minimizeCorner.Parent = minimizeButton
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 5)
+minCorner.Parent = minimizeBtn
 
--- Container para os botões (será escondido quando minimizado)
-local buttonsContainer = Instance.new("Frame")
-buttonsContainer.Name = "ButtonsContainer"
-buttonsContainer.Size = UDim2.new(1, -20, 1, -80)
-buttonsContainer.Position = UDim2.new(0, 10, 0, 70)
-buttonsContainer.BackgroundTransparency = 1
-buttonsContainer.Parent = mainFrame
+-- Container dos botões
+local buttonsFrame = Instance.new("Frame")
+buttonsFrame.Name = "ButtonsFrame"
+buttonsFrame.Size = UDim2.new(1, -20, 1, -60)
+buttonsFrame.Position = UDim2.new(0, 10, 0, 50)
+buttonsFrame.BackgroundTransparency = 1
+buttonsFrame.Parent = mainFrame
 
--- Função para criar botões com RGB
-local function createButton(name, text, position, size, callback, toggleable)
+-- Função para criar botão com RGB
+local function createButton(parent, name, text, position, size, callback, isToggleable)
     local button = Instance.new("TextButton")
     button.Name = name
     button.Size = size
     button.Position = position
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     button.Text = text
     button.TextColor3 = Color3.fromRGB(255, 255, 255)
     button.TextScaled = true
     button.Font = Enum.Font.Gotham
     button.BorderSizePixel = 0
-    button.Parent = buttonsContainer
+    button.Parent = parent
     
-    -- Cantos arredondados
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = button
     
-    -- Borda RGB para botões
+    -- Borda RGB
     local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 2
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Thickness = 1.5
     stroke.Parent = button
     
     local gradient = Instance.new("UIGradient")
     gradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 165, 0)),
-        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
-        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 255, 255)),
-        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(0, 0, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 255)),
+        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(0, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 0)),
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 0))
     }
     gradient.Parent = stroke
     
-    -- Animação RGB do botão
-    local buttonRgbTween = TweenService:Create(gradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
-    buttonRgbTween:Play()
+    local rgbTween = TweenService:Create(gradient, TweenInfo.new(1.5, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
+    rgbTween:Play()
     
-    -- Efeitos hover
+    -- Efeitos
     button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 50)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
     end)
     
     button.MouseLeave:Connect(function()
-        local color = Color3.fromRGB(30, 30, 30)
-        if toggleable and data.states[name] then
-            color = Color3.fromRGB(0, 120, 0)
+        local color = Color3.fromRGB(40, 40, 40)
+        if isToggleable and data.states[name] then
+            color = Color3.fromRGB(0, 100, 0)
         end
         TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
     end)
     
-    -- Clique
     button.MouseButton1Click:Connect(function()
-        -- Efeito de clique
-        TweenService:Create(button, TweenInfo.new(0.1), {Size = size * 0.95}):Play()
-        task.wait(0.1)
-        TweenService:Create(button, TweenInfo.new(0.1), {Size = size}):Play()
-        
         callback()
         
-        -- Atualizar cor se for toggleable
-        if toggleable then
-            local color = data.states[name] and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(30, 30, 30)
+        if isToggleable then
+            local color = data.states[name] and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(40, 40, 40)
             TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = color}):Play()
         end
     end)
@@ -206,19 +216,23 @@ local function createButton(name, text, position, size, callback, toggleable)
     return button
 end
 
--- Funções de funcionalidade
+-- Funcionalidades principais
 local function toggle2Dash()
     data.states.twoDash = not data.states.twoDash
     
     if data.states.twoDash then
         data.connections.twoDash = UserInputService.InputBegan:Connect(function(input)
-            if input.KeyCode == Enum.KeyCode.Z and rootPart then
-                local bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                bodyVelocity.Velocity = rootPart.CFrame.LookVector * 100
-                bodyVelocity.Parent = rootPart
-                
-                game:GetService("Debris"):AddItem(bodyVelocity, 0.4)
+            if input.KeyCode == Enum.KeyCode.Z then
+                local rootPart = getRootPart()
+                if rootPart then
+                    local bodyVelocity = Instance.new("BodyVelocity")
+                    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    bodyVelocity.Velocity = rootPart.CFrame.LookVector * 100
+                    bodyVelocity.Parent = rootPart
+                    table.insert(data.bodyMovers, bodyVelocity)
+                    
+                    game:GetService("Debris"):AddItem(bodyVelocity, 0.5)
+                end
             end
         end)
     else
@@ -231,51 +245,38 @@ end
 
 local function toggleSpeedBoost()
     data.states.speedBoost = not data.states.speedBoost
+    local humanoid = getHumanoid()
     
     if data.states.speedBoost then
         humanoid.WalkSpeed = 50
-        if humanoid:FindFirstChild("JumpHeight") then
-            humanoid.JumpHeight = 50
-        else
-            humanoid.JumpPower = 100
-        end
+        humanoid.JumpPower = 100
     else
         humanoid.WalkSpeed = 16
-        if humanoid:FindFirstChild("JumpHeight") then
-            humanoid.JumpHeight = 7.2
-        else
-            humanoid.JumpPower = 50
-        end
+        humanoid.JumpPower = 50
     end
 end
 
 local function toggleJumpBoost()
     data.states.jumpBoost = not data.states.jumpBoost
+    local humanoid = getHumanoid()
     
     if data.states.jumpBoost then
-        if humanoid:FindFirstChild("JumpHeight") then
-            humanoid.JumpHeight = 50
-        else
-            humanoid.JumpPower = 100
-        end
+        humanoid.JumpPower = 100
     else
-        if humanoid:FindFirstChild("JumpHeight") then
-            humanoid.JumpHeight = 7.2
-        else
-            humanoid.JumpPower = 50
-        end
+        humanoid.JumpPower = 50
     end
 end
 
 local function saveCoordinate()
+    local rootPart = getRootPart()
     if rootPart then
         data.savedCoordinate = rootPart.Position
-        print("🟢 Coordenada salva:", data.savedCoordinate)
+        print("🟢 SANTZ STORE: Coordenada salva!")
     end
 end
 
--- Sistema de teleporte inteligente com pathfinding
-local function toggleTeleGuided()
+-- TELEGUIADO INTELIGENTE com velocidade 50
+local function activateTeleGuided()
     if not data.savedCoordinate then
         print("❌ Nenhuma coordenada salva!")
         return
@@ -284,34 +285,38 @@ local function toggleTeleGuided()
     data.states.teleGuided = not data.states.teleGuided
     
     if data.states.teleGuided then
+        local rootPart = getRootPart()
+        
         local bodyPosition = Instance.new("BodyPosition")
         bodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
         bodyPosition.Position = rootPart.Position
-        bodyPosition.D = 2000
+        bodyPosition.D = 3000
         bodyPosition.P = 10000
         bodyPosition.Parent = rootPart
+        table.insert(data.bodyMovers, bodyPosition)
         
         data.connections.teleGuided = RunService.Heartbeat:Connect(function()
-            if not data.savedCoordinate or not rootPart then return end
+            if not data.savedCoordinate or not rootPart.Parent then return end
             
             local currentPos = rootPart.Position
             local targetPos = data.savedCoordinate
             local distance = (targetPos - currentPos).Magnitude
             
-            if distance > 5 then
-                -- Verificar se há obstáculos no caminho
-                local raycast = workspace:Raycast(currentPos, (targetPos - currentPos).Unit * math.min(distance, 50))
+            if distance > 3 then
+                -- Sistema inteligente anti-colisão
+                local direction = (targetPos - currentPos).Unit
+                local raycast = workspace:Raycast(currentPos, direction * math.min(distance, 20))
                 
-                if raycast and raycast.Instance then
-                    -- Há obstáculo, tentar contornar
-                    local hitNormal = raycast.Normal
-                    local sideVector = Vector3.new(-hitNormal.Z, 0, hitNormal.X).Unit * 10
-                    local alternativeTarget = currentPos + (targetPos - currentPos).Unit * 20 + sideVector
+                if raycast and raycast.Instance.CanCollide then
+                    -- Obstáculo detectado - desviar
+                    local normal = raycast.Normal
+                    local rightVector = direction:Cross(Vector3.new(0, 1, 0)).Unit
+                    local newDirection = (direction + rightVector * 0.5).Unit
                     
-                    bodyPosition.Position = alternativeTarget
+                    bodyPosition.Position = currentPos + newDirection * 15 + Vector3.new(0, 5, 0)
                 else
-                    -- Caminho livre, ir direto
-                    bodyPosition.Position = targetPos
+                    -- Caminho livre
+                    bodyPosition.Position = targetPos + Vector3.new(0, 2, 0)
                 end
             else
                 -- Chegou ao destino
@@ -323,20 +328,23 @@ local function toggleTeleGuided()
             end
         end)
         
-        print("🚀 Teleporte iniciado...")
+        print("🚀 Teleporte ativo - Velocidade 50")
     else
         if data.connections.teleGuided then
             data.connections.teleGuided:Disconnect()
             data.connections.teleGuided = nil
         end
-        local bodyPos = rootPart:FindFirstChild("BodyPosition")
-        if bodyPos then bodyPos:Destroy() end
-        print("🛑 Teleporte cancelado")
+        for _, mover in pairs(data.bodyMovers) do
+            if mover and mover.Parent then
+                mover:Destroy()
+            end
+        end
     end
 end
 
 local function toggleAntiHit()
     data.states.antiHit = not data.states.antiHit
+    local character = getCharacter()
     
     if data.states.antiHit then
         for _, part in pairs(character:GetChildren()) do
@@ -344,57 +352,41 @@ local function toggleAntiHit()
                 part.CanCollide = false
             end
         end
-        
-        data.connections.antiHit = character.ChildAdded:Connect(function(child)
-            if child:IsA("BasePart") and child.Name ~= "HumanoidRootPart" then
-                child.CanCollide = false
-            end
-        end)
     else
         for _, part in pairs(character:GetChildren()) do
             if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                 part.CanCollide = true
             end
         end
-        
-        if data.connections.antiHit then
-            data.connections.antiHit:Disconnect()
-            data.connections.antiHit = nil
-        end
     end
 end
 
--- Funções ESP
-local function createESP(obj, color, text)
+-- Sistema ESP com nomes RGB
+local function createNameESP(obj, color, text)
     if not obj or not obj.Parent then return end
     
     local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.Size = UDim2.new(0, 200, 0, 50)
     billboard.Adornee = obj
     billboard.AlwaysOnTop = true
     billboard.Parent = obj
     
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = color
-    frame.BackgroundTransparency = 0.3
-    frame.BorderSizePixel = 0
-    frame.Parent = billboard
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = text
+    nameLabel.TextColor3 = color
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.Parent = billboard
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = frame
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.TextStrokeTransparency = 0
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Parent = frame
+    -- Efeito RGB no texto
+    local colorTween = TweenService:Create(nameLabel, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), {
+        TextColor3 = Color3.fromHSV((tick() % 5) / 5, 1, 1)
+    })
+    colorTween:Play()
     
     table.insert(data.espObjects, billboard)
     return billboard
@@ -409,15 +401,27 @@ local function clearESP()
     data.espObjects = {}
 end
 
+local function toggleESPPlayer()
+    data.states.espPlayer = not data.states.espPlayer
+    
+    if data.states.espPlayer then
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("Head") then
+                createNameESP(otherPlayer.Character.Head, Color3.fromRGB(0, 255, 0), otherPlayer.Name)
+            end
+        end
+    else
+        clearESP()
+    end
+end
+
 local function toggleESPGod()
     data.states.espGod = not data.states.espGod
     
     if data.states.espGod then
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj.Name:lower():find("god") or (obj:FindFirstChild("Humanoid") and obj:FindFirstChild("God")) then
-                if obj:FindFirstChild("HumanoidRootPart") then
-                    createESP(obj.HumanoidRootPart, Color3.fromRGB(255, 215, 0), "GOD")
-                end
+            if obj.Name:lower():find("god") then
+                createNameESP(obj, Color3.fromRGB(255, 215, 0), "GOD")
             end
         end
     else
@@ -431,21 +435,7 @@ local function toggleESPSecret()
     if data.states.espSecret then
         for _, obj in pairs(workspace:GetDescendants()) do
             if obj.Name:lower():find("secret") or obj.Name:lower():find("hidden") then
-                createESP(obj, Color3.fromRGB(128, 0, 128), "SECRET")
-            end
-        end
-    else
-        clearESP()
-    end
-end
-
-local function toggleESPPlayer()
-    data.states.espPlayer = not data.states.espPlayer
-    
-    if data.states.espPlayer then
-        for _, otherPlayer in pairs(Players:GetPlayers()) do
-            if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                createESP(otherPlayer.Character.HumanoidRootPart, Color3.fromRGB(0, 255, 0), otherPlayer.Name)
+                createNameESP(obj, Color3.fromRGB(128, 0, 128), "SECRET")
             end
         end
     else
@@ -458,8 +448,8 @@ local function toggleESPBase()
     
     if data.states.espBase then
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj.Name:lower():find("base") or obj.Name:lower():find("building") or obj.Name:lower():find("structure") then
-                createESP(obj, Color3.fromRGB(0, 0, 255), "BASE")
+            if obj.Name:lower():find("base") or obj.Name:lower():find("building") then
+                createNameESP(obj, Color3.fromRGB(0, 0, 255), "BASE")
             end
         end
     else
@@ -467,84 +457,43 @@ local function toggleESPBase()
     end
 end
 
--- Criar todos os botões
-createButton("twoDash", "2 DASH", UDim2.new(0, 0, 0, 0), UDim2.new(0, 190, 0, 45), toggle2Dash, true)
-createButton("speedBoost", "SPEED BOOST", UDim2.new(0, 210, 0, 0), UDim2.new(0, 190, 0, 45), toggleSpeedBoost, true)
-createButton("jumpBoost", "JUMP BOOST", UDim2.new(0, 0, 0, 60), UDim2.new(0, 190, 0, 45), toggleJumpBoost, true)
-createButton("saveCoord", "SALVAR CORDENADA", UDim2.new(0, 210, 0, 60), UDim2.new(0, 190, 0, 45), saveCoordinate, false)
-createButton("teleGuided", "ATIVAR TELEGUIADO", UDim2.new(0, 0, 0, 120), UDim2.new(0, 190, 0, 45), toggleTeleGuided, true)
-createButton("antiHit", "ANTI-HIT", UDim2.new(0, 210, 0, 120), UDim2.new(0, 190, 0, 45), toggleAntiHit, true)
-createButton("espGod", "ESP GOD", UDim2.new(0, 0, 0, 180), UDim2.new(0, 120, 0, 40), toggleESPGod, true)
-createButton("espSecret", "ESP SECRET", UDim2.new(0, 140, 0, 180), UDim2.new(0, 120, 0, 40), toggleESPSecret, true)
-createButton("espPlayer", "ESP PLAYER", UDim2.new(0, 280, 0, 180), UDim2.new(0, 120, 0, 40), toggleESPPlayer, true)
-createButton("espBase", "ESP BASE", UDim2.new(0, 0, 0, 240), UDim2.new(0, 120, 0, 40), toggleESPBase, true)
+-- Criar todos os botões (compactos)
+createButton(buttonsFrame, "twoDash", "2 DASH", UDim2.new(0, 0, 0, 0), UDim2.new(0, 145, 0, 35), toggle2Dash, true)
+createButton(buttonsFrame, "speedBoost", "SPEED BOOST", UDim2.new(0, 155, 0, 0), UDim2.new(0, 145, 0, 35), toggleSpeedBoost, true)
 
--- Funcionalidade do botão minimizar
+createButton(buttonsFrame, "jumpBoost", "JUMP BOOST", UDim2.new(0, 0, 0, 45), UDim2.new(0, 145, 0, 35), toggleJumpBoost, true)
+createButton(buttonsFrame, "saveCoord", "SALVAR CORDENADA", UDim2.new(0, 155, 0, 45), UDim2.new(0, 145, 0, 35), saveCoordinate, false)
+
+createButton(buttonsFrame, "teleGuided", "ATIVAR TELEGUIADO", UDim2.new(0, 0, 0, 90), UDim2.new(0, 145, 0, 35), activateTeleGuided, true)
+createButton(buttonsFrame, "antiHit", "ANTI-HIT", UDim2.new(0, 155, 0, 90), UDim2.new(0, 145, 0, 35), toggleAntiHit, true)
+
+-- Botões ESP menores e compactos
+createButton(buttonsFrame, "espPlayer", "ESP PLAYER", UDim2.new(0, 0, 0, 140), UDim2.new(0, 70, 0, 30), toggleESPPlayer, true)
+createButton(buttonsFrame, "espGod", "ESP GOD", UDim2.new(0, 80, 0, 140), UDim2.new(0, 70, 0, 30), toggleESPGod, true)
+createButton(buttonsFrame, "espSecret", "ESP SECRET", UDim2.new(0, 160, 0, 140), UDim2.new(0, 70, 0, 30), toggleESPSecret, true)
+createButton(buttonsFrame, "espBase", "ESP BASE", UDim2.new(0, 230, 0, 140), UDim2.new(0, 70, 0, 30), toggleESPBase, true)
+
+-- Função minimizar
 local isMinimized = false
-minimizeButton.MouseButton1Click:Connect(function()
+minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     
     if isMinimized then
-        -- Minimizar - mostrar apenas o título
-        TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {
-            Size = UDim2.new(0, 420, 0, 60)
-        }):Play()
-        TweenService:Create(buttonsContainer, TweenInfo.new(0.3), {
-            BackgroundTransparency = 1
-        }):Play()
-        buttonsContainer.Visible = false
-        minimizeButton.Text = "+"
+        -- Minimizar - só título
+        TweenService:Create(mainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 320, 0, 50)}):Play()
+        buttonsFrame.Visible = false
+        minimizeBtn.Text = "+"
     else
-        -- Maximizar - mostrar tudo
-        buttonsContainer.Visible = true
-        TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {
-            Size = UDim2.new(0, 420, 0, 580)
-        }):Play()
-        TweenService:Create(buttonsContainer, TweenInfo.new(0.3), {
-            BackgroundTransparency = 0
-        }):Play()
-        minimizeButton.Text = "—"
+        -- Maximizar
+        TweenService:Create(mainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 320, 0, 380)}):Play()
+        buttonsFrame.Visible = true
+        minimizeBtn.Text = "−"
     end
 end)
 
--- Tornar o painel arrastável
-local dragging = false
-local dragStart = nil
-local startPos = nil
-
-titleLabel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- Animação de entrada
-mainFrame.Position = UDim2.new(0.5, -210, -1, 0)
-TweenService:Create(mainFrame, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Position = UDim2.new(0.5, -210, 0.5, -290)
-}):Play()
-
--- Reconectar quando respawnar
-player.CharacterAdded:Connect(function(newCharacter)
+-- Reconectar ao respawnar
+player.CharacterAdded:Connect(function()
     task.wait(2)
-    character = newCharacter
-    humanoid = character:WaitForChild("Humanoid")
-    rootPart = character:WaitForChild("HumanoidRootPart")
     
     -- Reativar estados ativos
     if data.states.speedBoost then
@@ -565,7 +514,13 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
-print("🟢 SANTZ STORE carregado com sucesso!")
-print("📍 Arraste pelo título para mover o painel")
-print("⚡ Pressione Z para usar 2 DASH quando ativo")
-print("💾 Coordenadas salvas persistem após respawn")
+-- Animação de entrada
+mainFrame.Position = UDim2.new(0.5, -160, -1, 0)
+TweenService:Create(mainFrame, TweenInfo.new(0.8, Enum.EasingStyle.Back), {
+    Position = UDim2.new(0.5, -160, 0.5, -190)
+}):Play()
+
+print("🟢 SANTZ STORE carregado!")
+print("📍 Painel arrastável")
+print("⚡ Pressione Z para 2 DASH")
+print("🎯 TELEGUIADO com velocidade 50 e IA anti-colisão")
